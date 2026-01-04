@@ -6,9 +6,8 @@ from analyze_frame import*
 def main():
     video_path = "C:\Documents\Startup Idea\IMG_9264.mov"
     cap = cv2.VideoCapture(video_path)
-    model = YOLO("yolov8n.pt")
+    model = YOLO("yolov8n-pose.pt")
     conf_threshold = 0.2
-    dim_background = True
 
     if not cap.isOpened():
         raise RuntimeError(f"Could not open video: {video_path}")
@@ -30,8 +29,8 @@ def main():
                 break
 
             # --- Analyze frame here ---
-            processed_frame = analyze_frame(frame, model,
-                                            conf_threshold, dim_background)
+            processed_frame, d = analyze_frame(frame, model,
+                                            conf_threshold)
 
             cv2.imshow("Video", processed_frame)
             frame_idx += 1
@@ -56,8 +55,8 @@ def main():
                 ret, frame = cap.read()
                 if not ret:
                     break
-                processed_frame = analyze_frame(frame, model,
-                                                conf_threshold, dim_background)
+                processed_frame, d = analyze_frame(frame, model,
+                                                conf_threshold)
                 cv2.imshow("Video", processed_frame)
                 frame_idx += 1
             elif key == ord("p"):
@@ -66,8 +65,8 @@ def main():
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
                 ret, frame = cap.read()
                 if ret:
-                    processed_frame = analyze_frame(frame, model,
-                                                    conf_threshold, dim_background)
+                    processed_frame, d = analyze_frame(frame, model,
+                                                    conf_threshold)
                     cv2.imshow("Video", processed_frame)
             elif key == ord(" "):
                 paused = False
