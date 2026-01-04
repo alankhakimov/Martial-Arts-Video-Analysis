@@ -1,81 +1,50 @@
-import cv2
-import numpy as np
-from ultralytics import YOLO
+from helpers import*
 
-def analyze_frame(frame, model, conf_threshold=0.3, draw_skeleton=True):
+def analyze_frame(frame, model, conf_threshold=0.3, draw_skeleton_flag=True):
     """
-    Runs fighter detection on a frame and returns a frame with optional skeleton/highlighted points.
-
-    Parameters
-    ----------
-    frame : np.ndarray
-        BGR image from OpenCV
-    model : YOLO model
-        YOLOv8-pose model
-    conf_threshold : float
-        YOLO confidence threshold
-    draw_skeleton : bool
-        Whether to draw the structural skeleton and keypoints
-
-    Returns
-    -------
-    output : np.ndarray
-        Frame with bounding boxes and optionally skeleton/keypoints
-    detections : list
-        List of detected persons with bounding boxes and keypoints
+    Main analyze frame function
     """
 
+    # analyze frame with YOLO
     results = model(frame, conf=conf_threshold, verbose=False)[0]
     output = frame.copy()
+
+    # list of dictionaries storing bounding boxes and keypoints
     detections = []
 
     if results.keypoints is None:
         return output, detections
 
-    # Define COCO structural skeleton: shoulders, elbows, wrists, hips, knees, ankles
+    # Structural skeleton (COCO indices)
     skeleton_structural = [
-        (5, 6),      # shoulders
-        (5, 7), (7, 9),  # left arm
-        (6, 8), (8, 10), # right arm
-        (5, 11), (6, 12), # torso sides
-        (11, 12),         # hips
-        (11, 13), (13, 15), # left leg
-        (12, 14), (14, 16)  # right leg
+        (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),
+        (5, 11), (6, 12), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16)
     ]
 
+    # Bounding boxes, skeleton and key points
     for box, kpts in zip(results.boxes, results.keypoints):
         if int(box.cls) != 0:
             continue
 
         # Draw bounding box
-        x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
-        cv2.rectangle(output, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        output, bbox_coords = draw_bbox(output, box)
 
-        if draw_skeleton:
-            # Convert keypoints and confidence to NumPy arrays
-            xy_array = kpts.xy.cpu().numpy().reshape(-1, 2)      # shape (num_joints, 2)
-            conf_array = kpts.conf.cpu().numpy().flatten()        # shape (num_joints,)
+        if draw_skeleton_flag:
+            # Convert keypoints and confidence
+            xy_array = kpts.xy.cpu().numpy().reshape(-1, 2)
+            conf_array = kpts.conf.cpu().numpy().flatten()
 
-            # Draw keypoints
-            for i in range(xy_array.shape[0]):
-                x, y = xy_array[i]
-                conf = conf_array[i]
-                if conf > 0.7:
-                    cv2.circle(output, (int(x), int(y)), 3, (0, 0, 255), -1)
-
-            # Draw structural skeleton lines
-            for start_idx, end_idx in skeleton_structural:
-                if conf_array[start_idx] > 0.7 and conf_array[end_idx] > 0.7:
-                    x0, y0 = xy_array[start_idx]
-                    x1, y1 = xy_array[end_idx]
-                    cv2.line(output, (int(x0), int(y0)), (int(x1), int(y1)), (255, 0, 0), 2)
+            # Draw keypoints and skeleton
+            output = draw_keypoints(output, xy_array, conf_array, conf_thresh=0.9)
+            output = draw_skeleton(output, xy_array, conf_array, skeleton_structural, conf_thresh=0.9)
 
         # Store detection info
         detections.append({
-            "bbox": (x1, y1, x2, y2),
+            "bbox": bbox_coords,
             "keypoints": kpts
         })
 
     return output, detections
+
 
 
